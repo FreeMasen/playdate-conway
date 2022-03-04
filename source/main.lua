@@ -1,18 +1,44 @@
+
 import "CoreLibs/object"
 import "CoreLibs/graphics"
 import "CoreLibs/sprites"
 import "CoreLibs/timer"
 
+local menu = import "ui.lua"
+
 local gfx = playdate.graphics
-local state = {}
-local columns = 80
-local rows = 68
+
+local state = playdate.datastore.read()
+if not state then
+  local width, height = playdate.display.getSize()
+  state = {
+    menu = true,
+    seed_value = math.random(),
+    has_changed = false,
+    columns = width / 5,
+    rows = height / 5,
+    cell_size = 5,
+  }
+  playdate.datastore.write(state)
+end
+
+function state:set_seed_value(value)
+  self.has_changed = self.has_changed or value ~= self.seed_value
+  self.seed_value = value
+end
+
+function state:set_cell_size(value)
+  self.has_changed = self.has_changed or value ~= self.cell_size
+  local width, height = playdate.display.getSize()
+  self.columns = math.floor(width / value)
+  self.rows = math.floor(height / value)
+end
 
 local Cell = {}
 Cell.__index = Cell
 
 function Cell.new(x, y)
-  local alive = math.random() > 0.5
+  local alive = math.random() < state.seed_value
   return setmetatable({
     x = x,
     y = y,
@@ -68,10 +94,10 @@ end
 local cells = nil
 local function init_cells()
   cells = {}
-  for i=1,rows do
+  for i=1,state.rows do
     local row = {}
     table.insert(cells, row)
-    for j = 1, columns do
+    for j = 1, state.columns do
       table.insert(row, Cell.new(j, i))
     end
   end
@@ -84,7 +110,7 @@ function init()
     inited = true
   end
   init_cells()
-  for i=1,rows do
+  for i=1,state.rows do
     local above_idx = i-1
     if not cells[above_idx] then
       above_idx = #cells
@@ -93,8 +119,7 @@ function init()
     if not cells[below_idx] then
       below_idx = 1
     end
-    for j=1,columns do
-      
+    for j=1,state.columns do
       local left_idx = j - 1
       if not cells[i][left_idx] then
         left_idx = #cells[i]
@@ -118,7 +143,7 @@ end
 
 local function apply_rules()
   if not cells then
-    init()
+    return
   end
   for i, column in ipairs(cells) do
     for j, cell in ipairs(column) do
@@ -153,12 +178,13 @@ local function render()
       else
         gfx.setColor(gfx.kColorWhite)
       end
-      gfx.fillRect(x, y, 5, 5)
+      gfx.fillRect(x, y, state.cell_size, state.cell_size)
       gfx.setColor(gfx.kColorWhite)
-      gfx.drawRect(x, y, 5, 5)
+      gfx.drawRect(x, y, state.cell_size, state.cell_size)
       row.did_change = false
     end
   end
+  menu:update(state)
 end
 
 gfx.clear(gfx.kColorWhite)
@@ -169,19 +195,15 @@ function playdate.update()
 end
 
 function state.tick()
-  if not cells == nil then
+  if cells == nil then
     init()
+    return
   end
   apply_rules()
 end
 
-local first_tick = true
 function state.start()
   state.timer = playdate.timer.keyRepeatTimerWithDelay(500, 500, function()
-    if first_tick then
-      first_tick = false
-      return
-    end
     state.tick()
   end)
 end
@@ -192,6 +214,27 @@ function playdate.AButtonUp()
   playdate.timer.new(2, function()
     state.start()
   end)
+end
+
+function playdate.BButtonUp()
+  state.menu = not state.menu
+  if state.menu then
+    playdate.inputHandlers.push(menu:input_handlers(state))
+  else
+    playdate.inputHandlers.pop()
+    if state.has_changed then
+      state.timer:remove()
+      cells = nil
+      playdate.timer.new(2, function()
+        state.start()
+      end)
+      playdate.datastore.write(state)
+    end
+  end
+end
+
+if state.menu then
+  playdate.inputHandlers.push(menu:input_handlers(state))
 end
 
 state.start()
