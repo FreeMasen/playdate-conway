@@ -28,10 +28,12 @@ function state:set_seed_value(value)
 end
 
 function state:set_cell_size(value)
+  print("set_cell_size", self.cell_size, value)
   self.has_changed = self.has_changed or value ~= self.cell_size
   local width, height = playdate.display.getSize()
   self.columns = math.floor(width / value)
   self.rows = math.floor(height / value)
+  self.cell_size = value
 end
 
 local Cell = {}
@@ -172,7 +174,7 @@ local function render()
   end
   for i, column in ipairs(cells) do
     for j, row in ipairs(column) do
-      local x, y = (j-1)*5, (i-1)*5
+      local x, y = (j-1)*state.cell_size, (i-1)*state.cell_size
       if row.alive then
         gfx.setColor(gfx.kColorBlack)
       else

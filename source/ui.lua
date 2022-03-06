@@ -103,15 +103,16 @@ function m:draw_cell_size(x, y, cell_size)
 end
 
 function m:a_pressed(state)
+  print("a pressed ", self.selected)
   self.is_a_pressed = true
   if self.selected == "seed-up" then
     state:set_seed_value(math.min(0.9, state.seed_value + 0.1))
   elseif self.selected == "seed-down" then
     state:set_seed_value(math.max(0.1, state.seed_value - 0.1))
   elseif self.selected == "cell-up" then
-    state:set_cell_size(math.min(1, state.cell_size + 1))
-  elseif self.selected == "cell-up" then
-    state:set_cell_size(math.max(50, state.cell_size - 1))
+    state:set_cell_size(math.min(20, state.cell_size + 1))
+  elseif self.selected == "cell-down" then
+    state:set_cell_size(math.max(3, state.cell_size - 1))
   end
   playdate.timer.performAfterDelay(0.3, function()
     self.is_a_pressed = false
@@ -119,6 +120,7 @@ function m:a_pressed(state)
 end
 
 function m:up_pressed()
+  print("up pressed", self.selected)
   if self.selected == "seed-up" then
     self.selected = "cell-down"
   elseif self.selected == "seed-down" then
@@ -128,9 +130,11 @@ function m:up_pressed()
   elseif self.selected == "cell-up" then
     self.selected = "seed-down"
   end
+  print("new selection", self.selected)
 end
 
 function m:down_pressed()
+  print("down pressed", self.selected)
   if self.selected == "seed-up" then
     self.selected = "seed-down"
   elseif self.selected == "seed-down" then
@@ -138,8 +142,9 @@ function m:down_pressed()
   elseif self.selected == "cell-up" then
     self.selected = "cell-down"
   elseif self.selected == "cell-down" then
-    self.selected = "speed-up"
+    self.selected = "seed-up"
   end
+  print("new selection", self.selected)
 end
 
 function m:input_handlers(state)
