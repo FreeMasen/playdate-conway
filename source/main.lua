@@ -19,12 +19,14 @@ if not state then
     rows = height / 5,
     cell_size = 5,
     next_cell_info = {},
+    total_crank_change = 0,
   }
   playdate.datastore.write(state)
 end
+state.total_crank_change = 0
 
 function state:set_seed_value(value)
-  self.has_changed = self.has_changed or value ~= self.seed_value
+  self.did_change = self.did_change or value ~= self.seed_value
   self.seed_value = value
 end
 
@@ -45,7 +47,7 @@ end
 
 function state:set_cell_size(value)
   print("set_cell_size", self.cell_size, value)
-  self.has_changed = self.has_changed or value ~= self.cell_size
+  self.did_change = self.did_change or value ~= self.cell_size
   local width, height = playdate.display.getSize()
   local next_cell_info = {
     columns = math.floor(width / value),
@@ -267,7 +269,24 @@ function state:unpause()
     state.start()
   end)
 end
+
+function playdate.cranked(change, acceleratedChange)
+  if change < 0 then
+    return
   end
+  state.total_crank_change = (state.total_crank_change or 0) + change
+  if state.total_crank_change > 3.6 then
+    state.total_crank_change = 0
+    state.tick()
+  end
+end
+
+function playdate.crankDocked()
+  state:unpause()
+end
+
+function playdate.crankUndocked()
+  state:pause()
 end
 
 if state.menu then
@@ -275,3 +294,7 @@ if state.menu then
 end
 
 state.start()
+
+if not playdate.isCrankDocked() then
+  state:pause()
+end
