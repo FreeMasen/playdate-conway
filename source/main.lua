@@ -13,11 +13,12 @@ if not state then
   local width, height = playdate.display.getSize()
   state = {
     menu = true,
-    seed_value = math.random(),
+    seed_value = 0.5,
     has_changed = false,
     columns = width / 5,
     rows = height / 5,
     cell_size = 5,
+    next_cell_info = {},
   }
   playdate.datastore.write(state)
 end
@@ -27,13 +28,31 @@ function state:set_seed_value(value)
   self.seed_value = value
 end
 
+function state:increment_cell_size()
+  local current_size = self.cell_size
+  if self.next_cell_info and self.next_cell_info.cell_size then
+    current_size = self.next_cell_info.cell_size
+  end
+  self:set_cell_size(math.min(20, current_size + 1))
+end
+function state:decrement_cell_size()
+  local current_size = self.cell_size
+  if self.next_cell_info and self.next_cell_info.cell_size then
+    current_size = self.next_cell_info.cell_size
+  end
+  self:set_cell_size(math.max(3, current_size - 1))
+end
+
 function state:set_cell_size(value)
   print("set_cell_size", self.cell_size, value)
   self.has_changed = self.has_changed or value ~= self.cell_size
   local width, height = playdate.display.getSize()
-  self.columns = math.floor(width / value)
-  self.rows = math.floor(height / value)
-  self.cell_size = value
+  local next_cell_info = {
+    columns = math.floor(width / value),
+    rows = math.floor(height / value),
+    cell_size = value,
+  }
+  self.next_cell_info = next_cell_info
 end
 
 local Cell = {}
@@ -224,14 +243,30 @@ function playdate.BButtonUp()
     playdate.inputHandlers.push(menu:input_handlers(state))
   else
     playdate.inputHandlers.pop()
-    if state.has_changed then
+    if state.did_change then
       state.timer:remove()
       cells = nil
-      playdate.timer.new(2, function()
-        state.start()
-      end)
+      state.cell_size = state.next_cell_info.cell_size or state.cell_size
+      state.columns = state.next_cell_info.columns or state.columns
+      state.rows = state.next_cell_info.rows or state.rows
+      state.next_cell_info = {}
+      state:unpause()
       playdate.datastore.write(state)
     end
+  end
+end
+
+function state:pause()
+  if state.timer then
+    state.timer:remove()
+  end
+end
+
+function state:unpause()
+  state.timer = playdate.timer.new(2, function()
+    state.start()
+  end)
+end
   end
 end
 

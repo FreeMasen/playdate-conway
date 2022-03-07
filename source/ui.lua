@@ -33,7 +33,11 @@ function m:update(state)
   local _width, height = gfx.getTextSize(menu)
   gfx.drawTextAligned(menu, self.x + (self.width / 2), self.y + 2, kTextAlignment.center)
   self:draw_seed_random(self.x + 5, self.y + height + 2, state.seed_value)
-  self:draw_cell_size(self.x + 5, self.y + height + 50, state.cell_size)
+  local cell_size = state.cell_size
+  if state.next_cell_info and state.next_cell_info.cell_size then
+    cell_size = state.next_cell_info.cell_size
+  end
+  self:draw_cell_size(self.x + 5, self.y + height + 50, cell_size)
 end
 
 function m:draw_up_arrow_button(x, y, is_pressed, is_selected)
@@ -110,9 +114,9 @@ function m:a_pressed(state)
   elseif self.selected == "seed-down" then
     state:set_seed_value(math.max(0.1, state.seed_value - 0.1))
   elseif self.selected == "cell-up" then
-    state:set_cell_size(math.min(20, state.cell_size + 1))
+    state:increment_cell_size()
   elseif self.selected == "cell-down" then
-    state:set_cell_size(math.max(3, state.cell_size - 1))
+    state:decrement_cell_size()
   end
   playdate.timer.performAfterDelay(0.3, function()
     self.is_a_pressed = false
