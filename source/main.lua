@@ -5,39 +5,71 @@ import "CoreLibs/sprites"
 import "CoreLibs/timer"
 
 local menu = import "ui.lua"
+local Views = import "view_state.lua"
 
 local gfx = playdate.graphics
 
-local state = playdate.datastore.read()
-if not state then
-  local width, height = playdate.display.getSize()
-  state = {
-    menu = true,
-    seed_value = 0.5,
+local State = {}
+State.__index = State
+
+function State.from_raw(raw)
+  return setmetatable({
+    menu = raw.menu,
+    seed_value = raw.seed_value,
     has_changed = false,
-    columns = width / 5,
-    rows = height / 5,
-    cell_size = 5,
+    columns = raw.columns,
+    rows = raw.rows,
+    cell_size = raw.cell_size,
     next_cell_info = {},
     total_crank_change = 0,
-  }
-  playdate.datastore.write(state)
+    views = Views.new()
+  }, State)
 end
-state.total_crank_change = 0
 
-function state:set_seed_value(value)
+function State.read()
+  local raw = playdate.datastore.read()
+  if not raw then
+    local width, height = playdate.display.getSize()
+    local cell_size = 5
+    raw = {
+      menu = true,
+      seed_value = 0.5,
+      has_changed = false,
+      columns = width / cell_size,
+      rows = height / cell_size,
+      cell_size = cell_size,
+    }
+    playdate.datastore.write(raw)
+  end
+  return State.from_raw(raw)
+end
+
+local state = State.read()
+
+function State:raw()
+  return {
+    menu = self.menu,
+    seed_value = self.seed_value,
+    columns = self.columns,
+    rows = self.rows,
+    cell_size = self.cell_size,
+  }
+end
+
+function State:set_seed_value(value)
   self.did_change = self.did_change or value ~= self.seed_value
   self.seed_value = value
 end
 
-function state:increment_cell_size()
+function State:increment_cell_size()
   local current_size = self.cell_size
   if self.next_cell_info and self.next_cell_info.cell_size then
     current_size = self.next_cell_info.cell_size
   end
   self:set_cell_size(math.min(20, current_size + 1))
 end
-function state:decrement_cell_size()
+
+function State:decrement_cell_size()
   local current_size = self.cell_size
   if self.next_cell_info and self.next_cell_info.cell_size then
     current_size = self.next_cell_info.cell_size
@@ -45,7 +77,7 @@ function state:decrement_cell_size()
   self:set_cell_size(math.max(3, current_size - 1))
 end
 
-function state:set_cell_size(value)
+function State:set_cell_size(value)
   print("set_cell_size", self.cell_size, value)
   self.did_change = self.did_change or value ~= self.cell_size
   local width, height = playdate.display.getSize()
@@ -217,7 +249,7 @@ function playdate.update()
   playdate.timer.updateTimers()
 end
 
-function state.tick()
+function State:tick()
   if cells == nil then
     init()
     return
@@ -225,9 +257,9 @@ function state.tick()
   apply_rules()
 end
 
-function state.start()
-  state.timer = playdate.timer.keyRepeatTimerWithDelay(500, 500, function()
-    state.tick()
+function State:start()
+  self.timer = playdate.timer.keyRepeatTimerWithDelay(500, 500, function()
+    self:tick()
   end)
 end
 
@@ -235,7 +267,7 @@ function playdate.AButtonUp()
   state.timer:remove()
   cells = nil
   playdate.timer.new(2, function()
-    state.start()
+    state:start()
   end)
 end
 
@@ -253,20 +285,20 @@ function playdate.BButtonUp()
       state.rows = state.next_cell_info.rows or state.rows
       state.next_cell_info = {}
       state:unpause()
-      playdate.datastore.write(state)
+      playdate.datastore.write(state:raw())
     end
   end
 end
 
-function state:pause()
-  if state.timer then
-    state.timer:remove()
+function State:pause()
+  if self.timer then
+    self.timer:remove()
   end
 end
 
-function state:unpause()
-  state.timer = playdate.timer.new(2, function()
-    state.start()
+function State:unpause()
+  playdate.timer.new(2, function()
+    state:start()
   end)
 end
 
@@ -277,7 +309,7 @@ function playdate.cranked(change, acceleratedChange)
   state.total_crank_change = (state.total_crank_change or 0) + change
   if state.total_crank_change > 3.6 then
     state.total_crank_change = 0
-    state.tick()
+    state:tick()
   end
 end
 
@@ -293,7 +325,7 @@ if state.menu then
   playdate.inputHandlers.push(menu:input_handlers(state))
 end
 
-state.start()
+state:start()
 
 if not playdate.isCrankDocked() then
   state:pause()
