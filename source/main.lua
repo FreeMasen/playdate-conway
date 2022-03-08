@@ -10,15 +10,15 @@ local State = import "game_state.lua"
 local gfx = playdate.graphics
 local state = State.read()
 
-local function render()
+local function render(view)
   gfx.clear(gfx.kColorWhite)
-  if not state.cells then
+  if not view then
     return
   end
-  for i, column in ipairs(state.cells) do
-    for j, row in ipairs(column) do
+  for i, column in ipairs(view) do
+    for j, cell in ipairs(column) do
       local x, y = (j-1)*state.cell_size, (i-1)*state.cell_size
-      if row.alive then
+      if cell then
         gfx.setColor(gfx.kColorBlack)
       else
         gfx.setColor(gfx.kColorWhite)
@@ -34,7 +34,7 @@ end
 gfx.clear(gfx.kColorWhite)
 
 function playdate.update()
-  render()
+  render(state:view())
   playdate.timer.updateTimers()
 end
 
@@ -66,13 +66,13 @@ function playdate.BButtonUp()
 end
 
 function playdate.cranked(change, acceleratedChange)
-  if change < 0 then
-    return
-  end
   state.total_crank_change = (state.total_crank_change or 0) + change
   if state.total_crank_change > 3.6 then
     state.total_crank_change = 0
-    state:tick()
+    state:tick(true)
+  elseif state.total_crank_change < -3.6 then
+    state.total_crank_change = 0
+    state:tick(false)
   end
 end
 

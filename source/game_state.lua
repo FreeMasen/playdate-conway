@@ -11,7 +11,7 @@ local Cell = import "cell.lua"
 ---@field next_cell_info table Pending menu options
 ---@field total_crank_change number The current state of the crank
 ---@field views Views The view history
----@field cells Cell[] The view state for this run
+---@field cells Cell[][] The view state for this run
 local State = {}
 State.__index = State
 
@@ -148,6 +148,7 @@ function State:init()
      cell:set_neighbor("nw", self.cells[above_idx][left_idx])
     end
   end
+  self:push_current_view()
 end
 
 --- Apply the generational rules to the current cells
@@ -155,6 +156,7 @@ function State:apply_rules()
   if not self.cells then
     return
   end
+  local a_change = false
   for i, column in ipairs(self.cells) do
     for j, cell in ipairs(column) do
       local live_neighbors = cell:live_neighbor_count()
@@ -166,6 +168,7 @@ function State:apply_rules()
       if not cell.alive and live_neighbors == 3 then
         cell:set_alive(true)
       end
+      a_change = a_change or cell.did_change
     end
   end
   for i, column in ipairs(self.cells) do
@@ -173,21 +176,48 @@ function State:apply_rules()
       cell:complete_alive()
     end
   end
+  return a_change
+end
+
+function State:push_current_view()
+  local view = {}
+  for _, column in ipairs(self.cells) do
+    local pending = {}
+    table.insert(view, pending)
+    for _, cell in ipairs(column) do
+      table.insert(pending, cell.alive)
+    end
+  end
+  self.views:push(view)
 end
 
 --- Update the state for a single generation
-function State:tick()
+function State:tick(forward)
   if self.cells == nil then
     self:init()
     return
   end
-  self:apply_rules()
+  if forward then
+    if self.views:at_end() then
+      if self:apply_rules() then
+        self:push_current_view()
+      end
+    else
+      self.views:step_forward()
+    end
+  else
+    self.views:step_back()
+  end
+end
+
+function State:view()
+  return self.views:current()
 end
 
 --- Start the current series
 function State:start()
   self.timer = playdate.timer.keyRepeatTimerWithDelay(500, 500, function()
-    self:tick()
+    self:tick(true)
   end)
 end
 
